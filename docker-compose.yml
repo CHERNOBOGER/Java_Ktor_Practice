@@ -1,0 +1,177 @@
+version: '3.8'
+
+
+
+services:
+  # =====================
+  # DATABASES
+  # =====================
+
+
+  user-db:
+    image: postgres:15
+    container_name: user_db
+    environment:
+      POSTGRES_DB: user_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+
+  course-db:
+    image: postgres:15
+    container_name: course_db
+    environment:
+      POSTGRES_DB: course_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    networks:
+      - app-network
+    volumes:
+      - course_db_data:/var/lib/postgresql/data
+
+  rating-db:
+    image: postgres:15
+    container_name: rating_db
+    environment:
+      POSTGRES_DB: rating_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    networks:
+      - app-network
+    volumes:
+      - rating_db_data:/var/lib/postgresql/data
+
+  recommendation-db:
+    image: postgres:15
+    container_name: recommendation_db
+    environment:
+      POSTGRES_DB: recommendation_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    networks:
+      - app-network
+    volumes:
+      - recommendation_db_data:/var/lib/postgresql/data
+
+
+  # =====================
+  # KAFKA + ZOOKEEPER
+  # =====================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zk
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - app-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    networks:
+      - app-network
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+
+  # =====================
+  # SERVICES
+  # =====================
+
+  user-service:
+    build: ./user-service
+    container_name: user_service
+    depends_on:
+      - user-db
+    networks:
+      - app-network
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/user_service_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
+  course-service:
+    build: ./course-service
+    container_name: course_service
+    depends_on:
+      - course-db
+    networks:
+      - app-network
+    ports:
+      - "8091:8091"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://course-db:5432/course_service_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
+  rating-service:
+    build: ./rating-service
+    container_name: rating_service
+    depends_on:
+      - rating-db
+      - kafka
+    networks:
+      - app-network
+    ports:
+      - "8092:8092"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://rating-db:5432/rating_service_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+
+  recommendation-service:
+    build: ./recommendation-service
+    container_name: recommendation_service
+    depends_on:
+      - recommendation-db
+      - kafka
+      - course-service
+      - rating-service
+    networks:
+      - app-network
+    ports:
+      - "8093:8093"
+    environment:
+      DATABASE_URL: jdbc:postgresql://recommendation-db:5432/recommendation_service_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      COURSE_SERVICE_URL: http://course-service:8091
+      RATING_SERVICE_URL: http://rating-service:8092
+
+
+
+volumes:
+  user_db_data:
+  course_db_data:
+  rating_db_data:
+  recommendation_db_data:
+
+networks:
+  app-network:
+    driver: bridge
