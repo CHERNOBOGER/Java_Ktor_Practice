@@ -1,0 +1,1 @@
+include("recommendation-service", "user-service", "course-service", "rating-service")
