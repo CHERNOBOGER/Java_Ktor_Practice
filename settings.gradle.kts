@@ -1,1 +1,6 @@
-include("recommendation-service", "user-service", "course-service", "rating-service")
+rootProject.name = "Java_Ktor_Practice"
+
+include("course-service")
+include("rating-service")
+include("recommendation-service")
+include("user-service")
